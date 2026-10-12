@@ -1,0 +1,13 @@
+{
+  "name": "@collective/fair-launch",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "Meteora DBC fair launch: a 0.01% curve until 10 SOL, then DAMM v2, with a permissionless fee crank.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "@solana/web3.js": "^1.98.0"
+  }
+}

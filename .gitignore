@@ -1,0 +1,6 @@
+target/
+tmp/
+.anchor/
+node_modules/
+**/*-keypair.json
+*.so
