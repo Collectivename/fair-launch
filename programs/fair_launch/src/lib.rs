@@ -108,7 +108,9 @@ pub mod fair_launch {
             require!(
                 fair.treasury != Pubkey::default()
                     && fair.platform != Pubkey::default()
-                    && fair.treasury != fair.platform,
+                    && fair.treasury != fair.platform
+                    && fair.treasury != fair.key()
+                    && fair.platform != fair.key(),
                 FairError::BadDestination
             );
         }
@@ -331,7 +333,7 @@ pub mod fair_launch {
                 program_id: DAMM_ID,
                 accounts: vec![
                     AccountMeta::new_readonly(ctx.accounts.pool_authority.key(), false),
-                    AccountMeta::new(ctx.accounts.pool.key(), false),
+                    AccountMeta::new_readonly(ctx.accounts.pool.key(), false),
                     AccountMeta::new(ctx.accounts.position.key(), false),
                     AccountMeta::new(ctx.accounts.token_a_account.key(), false),
                     AccountMeta::new(ctx.accounts.token_b_account.key(), false),
@@ -482,7 +484,8 @@ pub struct Claim<'info> {
     /// CHECK: treasury base-token account.
     #[account(mut)]
     pub treasury_base_ata: UncheckedAccount<'info>,
-    /// CHECK: must equal the stored treasury.
+    /// CHECK: stored treasury. Writable so the wrapped-SOL close can pay it.
+    #[account(mut)]
     pub treasury: UncheckedAccount<'info>,
     /// CHECK: must equal the stored platform wallet.
     pub platform: UncheckedAccount<'info>,
@@ -523,7 +526,8 @@ pub struct Surplus<'info> {
     /// CHECK: platform wrapped-SOL account.
     #[account(mut)]
     pub platform_quote_ata: UncheckedAccount<'info>,
-    /// CHECK: stored treasury.
+    /// CHECK: stored treasury. Writable so the wrapped-SOL close can pay it.
+    #[account(mut)]
     pub treasury: UncheckedAccount<'info>,
     /// CHECK: stored platform wallet.
     pub platform: UncheckedAccount<'info>,
@@ -583,7 +587,8 @@ pub struct Graduated<'info> {
     /// CHECK: treasury base-token account.
     #[account(mut)]
     pub treasury_base_ata: UncheckedAccount<'info>,
-    /// CHECK: stored treasury.
+    /// CHECK: stored treasury. Writable so the wrapped-SOL close can pay it.
+    #[account(mut)]
     pub treasury: UncheckedAccount<'info>,
     /// CHECK: stored platform wallet.
     pub platform: UncheckedAccount<'info>,
@@ -739,7 +744,11 @@ fn check_graduated(ctx: &Context<Graduated>) -> Result<()> {
     let data = nft.try_borrow_data()?;
     let nft_mint = Pubkey::try_from(&data[0..32]).map_err(|_| error!(FairError::BadAccount))?;
     let owner = Pubkey::try_from(&data[32..64]).map_err(|_| error!(FairError::BadAccount))?;
-    let amount = u64::from_le_bytes(data[64..72].try_into().unwrap());
+    let amount = u64::from_le_bytes(
+        data[64..72]
+            .try_into()
+            .map_err(|_| error!(FairError::BadAccount))?,
+    );
     drop(data);
     require!(owner == fair.key() && amount == 1, FairError::NotOurPool);
     let (position, _) = Pubkey::find_program_address(&[b"position", nft_mint.as_ref()], &DAMM_ID);
@@ -982,7 +991,10 @@ fn token_amount(account: &UncheckedAccount) -> Result<u64> {
     }
     let data = account.try_borrow_data()?;
     require!(data.len() >= 72, FairError::BadAccount);
-    Ok(u64::from_le_bytes(data[64..72].try_into().unwrap()))
+    let bytes: [u8; 8] = data[64..72]
+        .try_into()
+        .map_err(|_| error!(FairError::BadAccount))?;
+    Ok(u64::from_le_bytes(bytes))
 }
 
 fn create_ata<'info>(
@@ -1119,7 +1131,7 @@ fn encode_config(
     push_u32(&mut d, 0);
     push_u64(&mut d, 0);
     d.push(0);
-    push_u16(&mut d, 0);
+    push_u16(&mut d, 0); // compoundingFeeBps
     d.push(0);
     d.push(0);
     push_u32(&mut d, 1);
@@ -1178,5 +1190,24 @@ mod split_tests {
         let (platform, treasury) = split_amounts(amount);
         assert_eq!(platform + treasury, amount);
         assert_eq!(platform, amount / 10);
+    }
+
+    #[test]
+    fn config_args_match_the_idl() {
+        let fee = 2_500_000u64;
+        let sqrt_start = 11u128;
+        let sqrt_end = 22u128;
+        let liquidity = 33u128;
+        let d = super::encode_config(fee, 0, sqrt_start, sqrt_end, liquidity);
+        assert_eq!(&d[..8], &super::CREATE_CONFIG);
+        assert_eq!(d.len(), 227);
+        assert_eq!(u64::from_le_bytes(d[8..16].try_into().unwrap()), fee);
+        assert_eq!(u64::from_le_bytes(d[45..53].try_into().unwrap()), crate::curve::QUOTE_GOAL as u64);
+        assert_eq!(u128::from_le_bytes(d[53..69].try_into().unwrap()), sqrt_start);
+        assert_eq!(d[127], 100);
+        assert_eq!(d[128], 1);
+        assert_eq!(u32::from_le_bytes(d[191..195].try_into().unwrap()), 1);
+        assert_eq!(u128::from_le_bytes(d[195..211].try_into().unwrap()), sqrt_end);
+        assert_eq!(u128::from_le_bytes(d[211..227].try_into().unwrap()), liquidity);
     }
 }
