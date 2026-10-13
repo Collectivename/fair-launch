@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
-  "description": "Meteora DBC fair launch: a 0.01% curve from a 100 SOL market cap until 20 SOL, then DAMM v2, with a permissionless fee crank.",
+  "description": "Meteora DBC fair launch: a 0.01% curve from a 100 SOL market cap until 40 SOL, then DAMM v2, with a permissionless fee crank.",
   "scripts": {
     "test": "node --experimental-strip-types src/curve.test.ts"
   },

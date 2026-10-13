@@ -7,7 +7,7 @@ use std::cmp::Ordering;
 
 pub const BAND_NUM: u64 = 10_001;
 pub const BAND_DEN: u64 = 10_000;
-pub const QUOTE_GOAL: u128 = 20_000_000_000;
+pub const QUOTE_GOAL: u128 = 40_000_000_000;
 pub const OPENING_MARKET_CAP: u64 = 100_000_000_000;
 pub const TOKEN_SUPPLY_RAW: u128 = 1_000_000_000_000_000;
 pub const RAW_PRICE_DENOMINATOR: u64 = 1_000_000_000_000_000;
@@ -161,7 +161,7 @@ pub fn sqrt_price_from_market_cap(market_cap_lamports: u64) -> Result<u128> {
     Ok(sqrt)
 }
 
-/// The only curve this program launches: 100 SOL of market cap, 20 SOL of quote.
+/// The only curve this program launches: 100 SOL of market cap, 40 SOL of quote.
 pub fn opening_curve(market_cap_lamports: u64) -> Result<FairCurve> {
     if market_cap_lamports != OPENING_MARKET_CAP {
         return err!(FairError::PriceOutOfRange);
@@ -235,10 +235,10 @@ mod tests {
         assert_eq!(curve.sqrt_end, 184_476_663_878_559_598);
         assert_eq!(
             curve.liquidity,
-            737_888_209_231_338_147_467_291_456_968_923_093
+            1_475_776_418_462_676_294_934_582_913_937_846_185
         );
-        assert_eq!(curve.quote_out, 20_000_000_000);
-        assert_eq!(curve.base_out, 199_990_000_749_938);
+        assert_eq!(curve.quote_out, 40_000_000_000);
+        assert_eq!(curve.base_out, 399_980_001_499_876);
         let ratio_num = mul_u128(curve.sqrt_end, curve.sqrt_end).unwrap();
         let ratio_den = mul_u128(curve.sqrt_start, curve.sqrt_start).unwrap();
         let left = mul_u256_u64(ratio_num, BAND_DEN).unwrap();

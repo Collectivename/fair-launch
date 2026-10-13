@@ -161,7 +161,7 @@ export function verifyFairLaunch(input: VerifyInput): FairAccount {
     throw new Error("The graduated pool fee does not match the curve fee.");
   }
   if (u64(config, CONFIG_THRESHOLD_OFFSET) !== QUOTE_GOAL) {
-    throw new Error("Graduation is not 20 SOL.");
+    throw new Error("Graduation is not 40 SOL.");
   }
   if (
     u128(config, CONFIG_SQRT_START_OFFSET) !== band.sqrtStart ||

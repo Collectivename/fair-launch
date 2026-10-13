@@ -12,8 +12,8 @@
 
 export const BAND_NUM = BigInt(10001);
 export const BAND_DEN = BigInt(10000);
-/** Net quote still in the curve when it graduates. 20 SOL. */
-export const QUOTE_GOAL = BigInt(20_000_000_000);
+/** Net quote still in the curve when it graduates. 40 SOL. */
+export const QUOTE_GOAL = BigInt(40_000_000_000);
 /** The only opening market cap the program accepts. 100 SOL. */
 export const OPENING_MARKET_CAP = BigInt(100_000_000_000);
 export const TOKEN_SUPPLY_RAW = BigInt(1_000_000_000_000_000);
@@ -31,7 +31,7 @@ export interface FairCurve {
   sqrtStart: bigint;
   sqrtEnd: bigint;
   liquidity: bigint;
-  /** Base tokens the 20 SOL raise buys, rounded up. */
+  /** Base tokens the 40 SOL raise buys, rounded up. */
   baseOut: bigint;
   /** Quote the segment collects, rounded down. At least {@link QUOTE_GOAL}. */
   quoteOut: bigint;
@@ -98,7 +98,7 @@ export function fairCurve(sqrtStart: bigint): FairCurve {
   const delta = sqrtEnd - sqrtStart;
   if (delta <= QUOTE_GOAL) {
     throw new CurveError(
-      "That opening price is too low for a 0.01% band to hold 20 SOL."
+      "That opening price is too low for a 0.01% band to hold 40 SOL."
     );
   }
   const liquidity = mulDivUp(QUOTE_GOAL, Q128, delta);
@@ -107,13 +107,13 @@ export function fairCurve(sqrtStart: bigint): FairCurve {
   }
   const quoteOut = (liquidity * delta) >> BigInt(128);
   if (quoteOut < QUOTE_GOAL || quoteOut > QUOTE_GOAL + BigInt(1)) {
-    throw new CurveError("The 20 SOL goal did not land on this band.");
+    throw new CurveError("The 40 SOL goal did not land on this band.");
   }
   const baseOut = mulDivUp(liquidity, delta, sqrtStart * sqrtEnd);
   const withBuffer = (baseOut * SWAP_BUFFER_NUM) / SWAP_BUFFER_DEN;
   if (withBuffer > TOKEN_SUPPLY_RAW) {
     throw new CurveError(
-      "20 SOL would buy more than the 1B supply at that opening market cap."
+      "40 SOL would buy more than the 1B supply at that opening market cap."
     );
   }
   return { sqrtStart, sqrtEnd, liquidity, baseOut, quoteOut };
