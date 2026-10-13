@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import { QUOTE_GOAL, fairCurveFromMarketCapLamports } from "./curve";
+import { OPENING_MARKET_CAP, QUOTE_GOAL, fairCurveFromMarketCapLamports } from "./curve";
 import {
   DAMM_LIQUIDITY_OFFSET,
   DAMM_SQRT_MAX_OFFSET,
@@ -120,6 +120,9 @@ export function verifyFairLaunch(input: VerifyInput): FairAccount {
   }
   const feeBps = feeBpsFromIndex(fair.feeIndex);
   if (!feeBps) throw new Error("The fee is not 0.25%, 1%, or 2%.");
+  if (fair.startMarketCapLamports !== OPENING_MARKET_CAP) {
+    throw new Error("The opening market cap is not 100 SOL.");
+  }
   const fee = FEES[feeBps];
   const band = fairCurveFromMarketCapLamports(fair.startMarketCapLamports);
   if (
@@ -158,7 +161,7 @@ export function verifyFairLaunch(input: VerifyInput): FairAccount {
     throw new Error("The graduated pool fee does not match the curve fee.");
   }
   if (u64(config, CONFIG_THRESHOLD_OFFSET) !== QUOTE_GOAL) {
-    throw new Error("Graduation is not 10 SOL.");
+    throw new Error("Graduation is not 20 SOL.");
   }
   if (
     u128(config, CONFIG_SQRT_START_OFFSET) !== band.sqrtStart ||

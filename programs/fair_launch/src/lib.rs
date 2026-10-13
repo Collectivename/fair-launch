@@ -19,10 +19,16 @@ pub const TOKEN_2022_ID: Pubkey = pubkey!("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXE
 pub const TOKEN_ID: Pubkey = pubkey!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 pub const ATA_ID: Pubkey = pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
 
+/// DAMM v2 fee configs for 0.25%, 1%, and 2%. Same addresses as the SDK.
+const FEE_CONFIGS: [Pubkey; 3] = [
+    pubkey!("7F6dnUcRuyM2TwR8myT1dYypFXpPSxqwKNSFNkxyNESd"),
+    pubkey!("Hv8Lmzmnju6m7kcokVKvwqz7QPmdX9XfKjJsXz8RXcjp"),
+    pubkey!("2c4cYd4reUYVRAB9kUUkrq55VPyy2FNQ3FDL4o12JXmq"),
+];
+
 pub const PLATFORM_BPS: u16 = 1_000;
 const BPS_DENOM: u128 = 10_000;
 const TOKEN_SUPPLY: u64 = 1_000_000_000_000_000;
-const MAX_MARKET_CAP_LAMPORTS: u64 = 1_000_000_000_000_000;
 const NAME_MAX: usize = 32;
 const SYMBOL_MAX: usize = 10;
 const URI_MAX: usize = 200;
@@ -83,12 +89,8 @@ pub mod fair_launch {
         fee_index: u8,
     ) -> Result<()> {
         check_metadata(&name, &symbol, &uri)?;
-        if start_market_cap_lamports == 0 || start_market_cap_lamports > MAX_MARKET_CAP_LAMPORTS {
-            return err!(FairError::PriceOutOfRange);
-        }
         let (fee_numerator, migration_fee_option) = fee_choice(fee_index)?;
-        let sqrt_start = curve::sqrt_price_from_market_cap(start_market_cap_lamports)?;
-        let band = curve::fair_curve(sqrt_start)?;
+        let band = curve::opening_curve(start_market_cap_lamports)?;
 
         {
             let fair = &mut ctx.accounts.fair;
@@ -742,6 +744,21 @@ fn check_graduated(ctx: &Context<Graduated>) -> Result<()> {
     require!(owner == fair.key() && amount == 1, FairError::NotOurPool);
     let (position, _) = Pubkey::find_program_address(&[b"position", nft_mint.as_ref()], &DAMM_ID);
     require!(ctx.accounts.position.key() == position, FairError::BadAccount);
+    let expected = damm_pool(fair.fee_index, &fair.mint)?;
+    require!(
+        ctx.accounts.pool.key() == expected && ctx.accounts.pool.owner == &DAMM_ID,
+        FairError::NotOurPool
+    );
+    require!(ctx.accounts.position.owner == &DAMM_ID, FairError::BadAccount);
+    {
+        let position_data = ctx.accounts.position.try_borrow_data()?;
+        require!(position_data.len() >= 72, FairError::BadAccount);
+        require!(
+            position_data[8..40] == expected.to_bytes()
+                && position_data[40..72] == nft_mint.to_bytes(),
+            FairError::NotOurPool
+        );
+    }
 
     let a = ctx.accounts.token_a_mint.key();
     let b = ctx.accounts.token_b_mint.key();
@@ -933,6 +950,18 @@ fn require_creator(pool: &UncheckedAccount, creator: &Pubkey) -> Result<()> {
 fn pool_pda(config: &Pubkey, mint: &Pubkey) -> (Pubkey, u8) {
     let (max, min) = if mint > &WSOL { (mint, &WSOL) } else { (&WSOL, mint) };
     Pubkey::find_program_address(&[b"pool", config.as_ref(), max.as_ref(), min.as_ref()], &DBC_ID)
+}
+
+fn damm_pool(fee_index: u8, mint: &Pubkey) -> Result<Pubkey> {
+    let Some(config) = FEE_CONFIGS.get(fee_index as usize) else {
+        return err!(FairError::BadFee);
+    };
+    let (max, min) = if mint > &WSOL { (mint, &WSOL) } else { (&WSOL, mint) };
+    Ok(Pubkey::find_program_address(
+        &[b"pool", config.as_ref(), max.as_ref(), min.as_ref()],
+        &DAMM_ID,
+    )
+    .0)
 }
 
 fn ata(owner: &Pubkey, token_program: &Pubkey, mint: &Pubkey) -> Pubkey {
@@ -1132,4 +1161,22 @@ fn push_u64(d: &mut Vec<u8>, v: u64) {
 }
 fn push_u128(d: &mut Vec<u8>, v: u128) {
     d.extend_from_slice(&v.to_le_bytes());
+}
+
+#[cfg(test)]
+mod split_tests {
+    use super::split_amounts;
+
+    #[test]
+    fn floor_keeps_dust_with_the_treasury() {
+        assert_eq!(split_amounts(0), (0, 0));
+        assert_eq!(split_amounts(1), (0, 1));
+        assert_eq!(split_amounts(9), (0, 9));
+        assert_eq!(split_amounts(10), (1, 9));
+        assert_eq!(split_amounts(11), (1, 10));
+        let amount = 123_456_789u64;
+        let (platform, treasury) = split_amounts(amount);
+        assert_eq!(platform + treasury, amount);
+        assert_eq!(platform, amount / 10);
+    }
 }

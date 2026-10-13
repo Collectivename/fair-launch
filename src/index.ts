@@ -18,6 +18,7 @@ export {
   BAND_NUM,
   BAND_DEN,
   QUOTE_GOAL,
+  OPENING_MARKET_CAP,
   TOKEN_SUPPLY_RAW,
   fairCurve,
   fairCurveFromMarketCapLamports,
@@ -25,6 +26,7 @@ export {
   CurveError,
 } from "./curve";
 export { quoteBuy, quoteSell, withSlippage } from "./quote";
+export { quoteSideIn } from "./quote-side";
 export {
   fairLaunchPda,
   dbcPoolPda,

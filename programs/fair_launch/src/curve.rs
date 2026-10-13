@@ -7,7 +7,8 @@ use std::cmp::Ordering;
 
 pub const BAND_NUM: u64 = 10_001;
 pub const BAND_DEN: u64 = 10_000;
-pub const QUOTE_GOAL: u128 = 10_000_000_000;
+pub const QUOTE_GOAL: u128 = 20_000_000_000;
+pub const OPENING_MARKET_CAP: u64 = 100_000_000_000;
 pub const TOKEN_SUPPLY_RAW: u128 = 1_000_000_000_000_000;
 pub const RAW_PRICE_DENOMINATOR: u64 = 1_000_000_000_000_000;
 pub const MIN_SQRT_PRICE: u128 = 4_295_048_016;
@@ -160,6 +161,14 @@ pub fn sqrt_price_from_market_cap(market_cap_lamports: u64) -> Result<u128> {
     Ok(sqrt)
 }
 
+/// The only curve this program launches: 100 SOL of market cap, 20 SOL of quote.
+pub fn opening_curve(market_cap_lamports: u64) -> Result<FairCurve> {
+    if market_cap_lamports != OPENING_MARKET_CAP {
+        return err!(FairError::PriceOutOfRange);
+    }
+    fair_curve(sqrt_price_from_market_cap(market_cap_lamports)?)
+}
+
 pub fn fair_curve(sqrt_start: u128) -> Result<FairCurve> {
     if sqrt_start < MIN_SQRT_PRICE || sqrt_start >= MAX_SQRT_PRICE {
         return err!(FairError::PriceOutOfRange);
@@ -221,15 +230,15 @@ mod tests {
 
     #[test]
     fn hundred_sol_matches_the_checked_band() {
-        let sqrt = sqrt_price_from_market_cap(100_000_000_000).unwrap();
-        assert_eq!(sqrt, 184_467_440_737_095_516);
-        let curve = fair_curve(sqrt).unwrap();
+        let curve = opening_curve(OPENING_MARKET_CAP).unwrap();
+        assert_eq!(curve.sqrt_start, 184_467_440_737_095_516);
         assert_eq!(curve.sqrt_end, 184_476_663_878_559_598);
         assert_eq!(
             curve.liquidity,
-            368_944_104_615_669_073_733_645_728_484_461_547
+            737_888_209_231_338_147_467_291_456_968_923_093
         );
-        assert_eq!(curve.quote_out, 10_000_000_000);
+        assert_eq!(curve.quote_out, 20_000_000_000);
+        assert_eq!(curve.base_out, 199_990_000_749_938);
         let ratio_num = mul_u128(curve.sqrt_end, curve.sqrt_end).unwrap();
         let ratio_den = mul_u128(curve.sqrt_start, curve.sqrt_start).unwrap();
         let left = mul_u256_u64(ratio_num, BAND_DEN).unwrap();
@@ -238,33 +247,8 @@ mod tests {
     }
 
     #[test]
-    fn fifty_and_thousand_sol_collect_ten_sol() {
-        for (mc, sqrt_start, sqrt_end, liquidity) in [
-            (
-                50_000_000_000u64,
-                130_438_178_253_327_822u128,
-                130_444_699_999_200_917u128,
-                521_765_756_505_093_569_101_379_517_253_240_122u128,
-            ),
-            (
-                1_000_000_000_000,
-                583_337_266_871_351_588,
-                583_366_433_005_560_028,
-                116_670_369_987_692_325_434_668_775_803_996_598,
-            ),
-        ] {
-            let sqrt = sqrt_price_from_market_cap(mc).unwrap();
-            assert_eq!(sqrt, sqrt_start);
-            let curve = fair_curve(sqrt).unwrap();
-            assert_eq!(curve.sqrt_end, sqrt_end);
-            assert_eq!(curve.liquidity, liquidity);
-            assert_eq!(curve.quote_out, 10_000_000_000);
-        }
-    }
-
-    #[test]
-    fn one_sol_does_not_fit_the_band() {
-        let sqrt = sqrt_price_from_market_cap(1_000_000_000).unwrap();
-        assert!(fair_curve(sqrt).is_err());
+    fn one_and_fifty_sol_are_rejected() {
+        assert!(opening_curve(1_000_000_000).is_err());
+        assert!(opening_curve(50_000_000_000).is_err());
     }
 }

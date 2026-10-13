@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import {
   BAND_DEN,
   BAND_NUM,
+  OPENING_MARKET_CAP,
   QUOTE_GOAL,
   bandRatio,
   fairCurveFromMarketCapLamports,
 } from "./curve.ts";
+import { quoteSideIn } from "./quote-side.ts";
 
-const curve = fairCurveFromMarketCapLamports(BigInt(100) * BigInt(1_000_000_000));
+const curve = fairCurveFromMarketCapLamports(OPENING_MARKET_CAP);
 const ratio = bandRatio(curve);
 
 assert.equal(curve.quoteOut >= QUOTE_GOAL, true);
@@ -15,13 +17,18 @@ assert.equal(curve.quoteOut <= QUOTE_GOAL + BigInt(1), true);
 assert.equal(ratio.num * BAND_DEN <= ratio.den * BAND_NUM, true);
 assert.equal(ratio.num * BAND_DEN > ratio.den * BAND_NUM - ratio.den, true);
 
-assert.throws(() => fairCurveFromMarketCapLamports(BigInt(1)), /too low|1B supply|outside/);
+assert.equal(quoteSideIn("buy"), true);
+assert.equal(quoteSideIn("sell"), false);
+assert.equal(quoteSideIn("buy", true), false);
+assert.equal(quoteSideIn("sell", true), false);
+assert.equal(quoteSideIn("buy", false), true);
+assert.equal(quoteSideIn("sell", false), true);
 
-for (const sol of [BigInt(50), BigInt(1000)]) {
-  const other = fairCurveFromMarketCapLamports(sol * BigInt(1_000_000_000));
-  const otherRatio = bandRatio(other);
-  assert.equal(other.quoteOut, QUOTE_GOAL);
-  assert.equal(otherRatio.num * BAND_DEN <= otherRatio.den * BAND_NUM, true);
+for (const sol of [BigInt(1), BigInt(50)]) {
+  assert.throws(
+    () => fairCurveFromMarketCapLamports(sol * BigInt(1_000_000_000)),
+    /100 SOL/,
+  );
 }
 
 console.log(

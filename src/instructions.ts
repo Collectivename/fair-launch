@@ -29,7 +29,7 @@ import {
   fairLaunchPda,
   tokenVaultPda,
 } from "./pda";
-import { quoteBuy, quoteSell, withSlippage } from "./quote";
+import { quoteBuy, quoteSell, quoteSideIn, withSlippage } from "./quote";
 
 function anchorDisc(name: string): Buffer {
   return createHash("sha256").update(`global:${name}`).digest().subarray(0, 8);
@@ -311,7 +311,6 @@ export function buildDammSwapIx(input: {
   tokenB: PublicKey;
   inputAccount: PublicKey;
   outputAccount: PublicKey;
-  inputIsA: boolean;
   amountIn: bigint;
   minOut: bigint;
 }): TransactionInstruction {
@@ -352,10 +351,7 @@ export function expectedSwapOut(input: {
   /** When true, sqrt price is sqrt(tokenB/tokenA) and the user is paying token A. */
   payingTokenA?: boolean;
 }): { expected: bigint; minOut: bigint } {
-  const payingA = input.payingTokenA === true;
-  const buy = input.side === "buy";
-  // DBC: buy pays quote and increases sqrt. DAMM token A is the "base" of sqrt(B/A).
-  const quoteIn = input.payingTokenA === undefined ? buy : buy ? !payingA : payingA;
+  const quoteIn = quoteSideIn(input.side, input.payingTokenA);
   const expected = quoteIn
     ? quoteBuy({
         sqrt: input.sqrt,

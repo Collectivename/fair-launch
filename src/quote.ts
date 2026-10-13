@@ -1,4 +1,7 @@
 import { FEE_DENOMINATOR } from "./constants";
+import { quoteSideIn } from "./quote-side";
+
+export { quoteSideIn };
 
 const Q128 = BigInt(1) << BigInt(128);
 
